@@ -1,2 +1,10 @@
-transcripts
 .env
+outputs
+Adresso21
+transcripts
+transcripts_test
+scripts/__pycache__
+src/__pycache__
+usage.txt
+predictions_task1.csv
+predictions_task2.csv
