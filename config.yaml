@@ -1,136 +1,91 @@
-# ===== Dataset Configuration =====
+# ===================================================================
+#                    CONFIGURAZIONE PRINCIPALE
+# ===================================================================
+
+# --- Impostazioni Generali ---
+seed: 42
+device: "cuda"  # "cuda" o "cpu"
+
+# --- Percorsi dei Dati ---
 data:
-  # Path to audio files (contains ad/ and cn/ folders)
   audio_root: "Adresso21/ADReSSo21-diagnosis-train/ADReSSo21/diagnosis/train/audio"
-  
-  # Path to transcripts (contains model_name folders, each with ad/ and cn/)
   transcripts_root: "transcripts"
-  
-  # Path to training labels CSV
   train_labels: "Adresso21/ADReSSo21-diagnosis-train/ADReSSo21/diagnosis/train/adresso-train-mmse-scores.csv"
   
-  # Path to test audio and transcripts
   test_audio_root: "Adresso21/ADReSSo21-diagnosis-test/ADReSSo21/diagnosis/test-dist/audio"
   test_transcripts_root: "transcripts_test"
+  test_task1_labels: "Adresso21/label_test_task1.csv"
+  test_task2_labels: "Adresso21/label_test_task2.csv"
 
-  # Path to test labels
-  test_task1_labels: "Adresso21/label_test_task1.csv"  # Classification
-  test_task2_labels: "Adresso21/label_test_task2.csv"  # Regression
-  
-  # Transcription model to use (folder name in transcripts_root)
-  transcription_model: "large-v3"  # or "large-v2", "nvidia-parakeet-tdt-0.6b-v2"
-  
-  # Split ratio for train/val
-  val_split: 0.15
-  
-  # Random seed
-  seed: 42
+# ===================================================================
+#                   CONFIGURAZIONE TRASCRIZIONE (ASR)
+# ===================================================================
+# Modifica 'engine' per scegliere quale motore ASR usare.
+# Lo script leggerà solo la sezione di configurazione corrispondente.
+# ===================================================================
 
-# ===== Model Configuration =====
-model:
-  # BERT model name from HuggingFace
-  bert_model: "bert-large-uncased"
-  
-  # Maximum sequence length
-  max_length: 512
-  
-  # Dropout for classification head
-  dropout: 0.1
-  
-  # MLP hidden size for classification
-  mlp_hidden_size: 256
-
-# ===== Training Configuration =====
-training:
-  # Task type: "classification" (task1) or "regression" (task2)
-  task: "classification"  # or "regression"
-  
-  # Number of epochs
-  epochs: 30
-  
-  # Batch size (FISSO per cross-validation)
-  batch_size: 8  # Ridotto per BERT-large
-  
-  # Learning rate
-  learning_rate: 2e-5
-  
-  # Weight decay for AdamW
-  weight_decay: 0.01
-  
-  # Gradient accumulation steps
-  gradient_accumulation_steps: 4  # 8*4=32 effective batch size
-  
-  # Warmup steps
-  warmup_steps: 100
-  
-  # Device
-  device: "cuda"  # or "cpu"
-  
-  # Mixed precision training
-  use_fp16: false
-  
-  # Early stopping patience
-  early_stopping_patience: 5
-  
-  # Output directory for checkpoints
-  output_dir: "outputs"
-  
-  # Save best model only
-  save_best_only: true
-  
-  # Evaluation metric (for classification: "accuracy", "f1"; for regression: "rmse", "mae")
-  eval_metric: "f1"
-
-# ===== Cross-Validation Configuration =====
-cross_validation:
-  # Enable cross-validation
-  enabled: true
-  
-  # Number of folds
-  n_folds: 5
-  
-  # Max epochs per fold
-  max_epochs: 15
-  
-  # Early stopping patience per fold
-  early_stopping_patience: 3
-  
-  # Hyperparameters to search (batch_size è FISSO a 32)
-  hyperparameters:
-    # Model architecture
-    model_type: ["simple", "mlp"]  # simple = solo linear, mlp = con hidden layer
-    
-    # Learning rate
-    learning_rate: [0.00001, 0.00002, 0.00003, 0.00005]  # 1e-5, 2e-5, 3e-5, 5e-5
-    
-    # Dropout
-    dropout: [0.1, 0.2, 0.3]
-    
-    # MLP hidden size (solo per model_type="mlp")
-    mlp_hidden_size: [128, 256, 512]
-    
-    # Weight decay
-    weight_decay: [0.01, 0.001]
-
-# ===== Transcription Configuration =====
 transcription:
-  # Engine: "nemo" or "whisperx"
-  engine: "whisperx"  # auto-detect based on model name
-  
-  # Device for transcription
-  device: "cuda"
-  
-  # Batch size for transcription
-  batch_size: 16
-  
-  # Compute type (for WhisperX/faster-whisper)
-  compute_type: "float16"
-  
-  # Number of workers (only for NeMo)
-  num_workers: 4
-  
-  # Overwrite existing transcripts
+  # CAMBIA QUI PER SCEGLIERE IL MOTORE: "crisperwhisper" o "nemo"
+  engine: "crisperwhisper"
   overwrite: false
-  
-  # Use alignment (WhisperX only)
-  align: false
+
+  # --- Impostazioni per CrisperWhisper (usate solo se engine: "crisperwhisper") ---
+  crisperwhisper:
+    # Modello Whisper di base usato da insanely-fast-whisper
+    whisper_model_name: "openai/whisper-large-v3"
+    
+    # Modello T5 per la correzione del testo
+    correction_model_name: "nyra-health/t5-large-text-correction"
+    
+    batch_size: 8
+    compute_type: "float16" # Usa "int8" se la GPU ha poca VRAM
+
+  # --- Impostazioni per NeMo (usate solo se engine: "nemo") ---
+  nemo:
+    model_name: "nvidia/parakeet-tdt-0.6b-v2"
+    batch_size: 16
+
+# ===================================================================
+#                     CONFIGURAZIONE ESPERIMENTO
+# ===================================================================
+# Questa sezione controlla le operazioni di training, predizione e valutazione
+# lanciate con 'python scripts/run.py'.
+# ===================================================================
+
+# --- Task e Modello ---
+task: "classification"    # "classification" o "regression"
+modality: "text"          # "text" o "audio"
+
+# Modello di trascrizione da usare per l'addestramento del modello testuale.
+# Deve corrispondere al nome della cartella creata da 'transcribe.py'.
+# Esempio per Crisper: "Crisper_whisper-large-v3"
+# Esempio per NeMo: "parakeet-tdt-0.6b-v2"
+transcription_model_for_training: "Crisper_whisper-large-v3"
+
+# --- Cross-Validation ---
+k_folds: 10
+output_dir: "outputs/bert_classification_crisper_large-v3" # Cartella dove salvare modelli e predizioni
+
+# --- Parametri del Modello ---
+model:
+  text:
+    name: "bert-base-uncased"
+    max_length: 512
+    dropout: 0.2
+
+  audio:
+    name: "ecapa-tdnn"
+    pretrained: "speechbrain/spkrec-ecapa-voxceleb"
+    sample_rate: 16000
+    trainable_encoder: true 
+    dropout: 0.2
+
+# --- Parametri di Addestramento ---
+training:
+  epochs: 15
+  batch_size: 8
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  warmup_steps: 100
+  early_stopping_patience: 3
+  eval_metric: "f1" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".

@@ -1,0 +1,22 @@
+# =============================================================
+#       Configurazione Stabile per NeMo 1.23 e Parakeet
+# =============================================================
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# --- Base di PyTorch (versione 2.2.0) ---
+torch==2.2.0
+torchvision==0.17.0
+torchaudio==2.2.0
+
+# --- Dipendenze Core del Progetto ---
+transformers
+scikit-learn
+pandas
+numpy<2.0
+pyyaml
+tqdm
+speechbrain
+
+
+# --- NeMo Toolkit (versione 1.23.0, compatibile con Parakeet) ---
+nemo_toolkit[asr]==1.23.0

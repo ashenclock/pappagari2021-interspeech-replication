@@ -1,0 +1,4 @@
+# Installa queste dipendenze se vuoi usare WhisperX come backend ASR
+# Comando: pip install -r requirements_whisperx.txt
+git+https://github.com/m-bain/whisperx.git
+faster-whisper

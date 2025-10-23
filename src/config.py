@@ -1,22 +1,23 @@
 import yaml
 from pathlib import Path
+from typing import Any
 
 class Config:
+    """
+    Classe per caricare la configurazione da un file YAML e permettere
+    l'accesso agli attributi tramite dot notation (es. config.data.audio_root).
+    """
     def __init__(self, data: dict):
         for key, value in data.items():
             if isinstance(value, dict):
-                # If the value is a dictionary, create a nested Config object
                 setattr(self, key, Config(value))
             else:
-                # Otherwise, just set the attribute
                 setattr(self, key, value)
 
     def __repr__(self):
-        # A simple representation for debugging
         return str(self.__dict__)
 
     def to_dict(self) -> dict:
-        """Recursively convert the configuration object to a dictionary."""
         result = {}
         for key, value in self.__dict__.items():
             if isinstance(value, Config):
@@ -25,31 +26,16 @@ class Config:
                 result[key] = value
         return result
 
-    def copy(self, update: dict | None = None) -> "Config":
-        """Create a shallow copy of the configuration with optional updates."""
-        data = self.to_dict()
-        update = update or {}
-        data.update(update)
-        return Config(data)
-
 def load_config(config_path: str | Path) -> Config:
-    """
-    Loads a YAML configuration file into a nested Config object
-    that allows attribute-style access.
-    """
+    """Carica un file di configurazione YAML."""
     path = Path(config_path)
     if not path.exists():
-        raise FileNotFoundError(f"Configuration file not found at: {path.resolve()}")
+        raise FileNotFoundError(f"File di configurazione non trovato in: {path.resolve()}")
         
     with open(path, 'r', encoding='utf-8') as f:
         config_data = yaml.safe_load(f)
     
     if not isinstance(config_data, dict):
-        raise TypeError("The root of the YAML file must be a dictionary.")
+        raise TypeError("La radice del file YAML deve essere un dizionario.")
         
     return Config(config_data)
-
-# Example of how to use it:
-# from src.config import load_config
-# config = load_config()
-# print(config.training.learning_rate)
