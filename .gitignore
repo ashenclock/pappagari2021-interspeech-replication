@@ -10,3 +10,6 @@ predictions_task1.csv
 predictions_task2.csv
 outputs_audio
 pappagari21_interspeech.pdf
+all_files.txt
+best_fused_submission.csv
+fused_submission.csv

@@ -43,9 +43,7 @@ def evaluate_epoch(model, loader, loss_fn, device, task, metric_name):
             # --- FIX: ANCHE QUESTA RIGA DEVE ESSERE ATTIVA ---
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
             labels = batch.pop('labels')
-            print(labels)
             outputs = model(batch)
-            print(batch,outputs)
             loss = loss_fn(outputs, labels)
             total_loss += loss.item()
             

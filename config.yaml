@@ -38,7 +38,7 @@ transcription:
     
   # --- Impostazioni per NeMo ---
   nemo:
-    model_name: "nvidia/parakeet-tdt-0.6b-v2"
+    model_name: "nvidia/parakeet-tdt-1.1b"
     batch_size: 2
 
   # --- Impostazioni per WhisperX ---
@@ -62,11 +62,11 @@ modality: "text"          # "text" o "audio"
 # Deve corrispondere al nome della cartella creata da 'transcribe.py'.
 # Esempio per Crisper: "Crisper_whisper-large-v3"
 # Esempio per NeMo: "parakeet-tdt-0.6b-v2"
-transcription_model_for_training: "parakeet-tdt-0.6b-v2"
+transcription_model_for_training: "parakeet-tdt-1.1b"
 
 # --- Cross-Validation ---
 k_folds: 10
-output_dir: "outputs/bert_classification_CrisperWhisper" # Cartella dove salvare modelli e predizioni
+output_dir: "outputs/bert_classification_parakeet-tdt-1.1b" # Cartella dove salvare modelli e predizioni
 
 # --- Parametri del Modello ---
 model:
@@ -90,4 +90,13 @@ training:
   weight_decay: 0.01
   warmup_ratio: 0.1
   early_stopping_patience: 5
-  eval_metric: "rmse" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
+  eval_metric: "accuracy" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
+
+score_generation_models:
+
+  - output_dir: "outputs/bert_classification_CrisperWhisper"
+    modality: "text"
+    task: "classification"
+  - output_dir: "outputs/bert_classification_parakeet-tdt-1.1b"
+    modality: "text"
+    task: "classification"
