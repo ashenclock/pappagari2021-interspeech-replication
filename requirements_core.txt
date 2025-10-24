@@ -1,10 +1,30 @@
-# Dipendenze base per il training, la gestione dati e l'inferenza
-transformers>=4.30.0
-scikit-learn>=1.2.0
-pandas>=2.0.0
-numpy<2.0
-pyyaml>=6.0
-tqdm>=4.65.0
+# ===================================================================
+#          Requisiti per l'ambiente di ricerca (Training, etc.)
+# ===================================================================
+# Questo file contiene tutte le dipendenze per eseguire lo script run.py
+# per le modalità text (BERT) e audio (ECAPA-TDNN).
+# ===================================================================
 
-# Per il modello acustico
-speechbrain>=0.5.14
+# --- URL extra per PyTorch (per le versioni con CUDA) ---
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# --- Framework Deep Learning ---
+torch==2.2.0
+torchaudio==2.2.0
+
+# --- Librerie NLP e Audio ---
+transformers==4.40.1
+speechbrain==0.5.16
+
+# --- Librerie per Gestione Dati e Machine Learning ---
+scikit-learn==1.4.2
+pandas==2.2.2
+
+# IMPORTANTE: Mantiene numpy a una versione stabile per la massima compatibilità
+# con le altre librerie (molte non supportano ancora numpy 2.0).
+numpy<2.0
+
+# --- Utilità ---
+pyyaml==6.0.1
+tqdm==4.66.4
+scipy==1.13.0

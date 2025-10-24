@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import random
 import gc
-
+import torch.nn as nn
 def set_seed(seed: int):
     """Imposta il seed per la riproducibilità."""
     random.seed(seed)
@@ -19,3 +19,4 @@ def clear_memory():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+

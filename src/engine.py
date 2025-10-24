@@ -16,7 +16,8 @@ def train_epoch(model, loader, optimizer, scheduler, loss_fn, device):
     for batch in tqdm(loader, desc="Training", leave=False):
         optimizer.zero_grad()
         
-        # Sposta il batch sul device corretto
+        # --- FIX: QUESTA RIGA DEVE ESSERE ATTIVA ---
+        # Sposta tutti i tensori del batch sul device corretto (es. GPU)
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         
         labels = batch.pop('labels')
@@ -39,10 +40,12 @@ def evaluate_epoch(model, loader, loss_fn, device, task, metric_name):
     
     with torch.no_grad():
         for batch in tqdm(loader, desc="Evaluating", leave=False):
+            # --- FIX: ANCHE QUESTA RIGA DEVE ESSERE ATTIVA ---
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
             labels = batch.pop('labels')
+            print(labels)
             outputs = model(batch)
-            
+            print(batch,outputs)
             loss = loss_fn(outputs, labels)
             total_loss += loss.item()
             
@@ -64,7 +67,7 @@ def evaluate_epoch(model, loader, loss_fn, device, task, metric_name):
         else:
             raise ValueError(f"Metrica '{metric_name}' non supportata per la classificazione.")
     else: # regression
-        metric = mean_squared_error(all_labels, all_preds, squared=False) # RMSE
+        metric = root_mean_squared_error(all_labels, all_preds) # RMSE
         
     return avg_loss, metric
 
@@ -81,11 +84,13 @@ class Trainer:
     def train(self):
         clear_memory()
         model = build_model(self.config).to(self.device)
-        
-        optimizer = torch.optim.AdamW(model.parameters(), lr=self.config.training.learning_rate, weight_decay=self.config.training.weight_decay)
+        if self.config.modality == 'text':
+            optimizer = torch.optim.AdamW(model.parameters(), lr=self.config.training.learning_rate, weight_decay=self.config.training.weight_decay)
+        else: # audio
+            optimizer = torch.optim.Adam(model.parameters(), lr=self.config.training.learning_rate, weight_decay=self.config.training.weight_decay)
         
         num_training_steps = len(self.train_loader) * self.config.training.epochs
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.config.training.warmup_steps, num_training_steps=num_training_steps)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=int(num_training_steps * self.config.training.warmup_ratio), num_training_steps=num_training_steps)
         
         loss_fn = nn.CrossEntropyLoss() if self.config.task == 'classification' else nn.MSELoss()
 
@@ -179,7 +184,7 @@ class Evaluator:
             self.labels_path = Path(config.data.test_task1_labels)
         else:
             self.labels_path = Path(config.data.test_task2_labels)
-
+    
     def evaluate(self):
         if not self.predictions_path.exists():
             raise FileNotFoundError(f"File di predizioni non trovato: {self.predictions_path}")
@@ -187,12 +192,45 @@ class Evaluator:
         preds_df = pd.read_csv(self.predictions_path)
         labels_df = pd.read_csv(self.labels_path)
         
+        # Assicuriamoci che la colonna ID si chiami allo stesso modo per il merge
+        # A volte i CSV hanno nomi leggermente diversi (es. 'id', 'ID', 'adressfname')
+        if 'ID' not in labels_df.columns:
+             # Cerca una colonna che potrebbe essere l'ID
+             possible_id_cols = [col for col in labels_df.columns if 'id' in col.lower() or 'name' in col.lower()]
+             if possible_id_cols:
+                 labels_df = labels_df.rename(columns={possible_id_cols[0]: 'ID'})
+             else:
+                 raise ValueError("Non riesco a trovare la colonna ID nel file delle etichette.")
+
         merged_df = pd.merge(preds_df, labels_df, on="ID")
         
         y_pred = merged_df['prediction']
         
         if self.config.task == 'classification':
-            y_true = merged_df['Dx']
+            # --- FIX CRUCIALE: MAPPING DELLE ETICHETTE ---
+            # Convertiamo le stringhe 'Control'/'ProbableAD' in 0/1
+            # Adatta questo dizionario se le tue etichette sono diverse (es. 'CN'/'AD')
+            label_mapping = {'Control': 0, 'ProbableAD': 1, 'CN': 0, 'AD': 1}
+            
+            # Usa la colonna corretta per la diagnosi. Potrebbe chiamarsi 'Dx', 'diagnosis', ecc.
+            # Cerchiamo di essere flessibili.
+            dx_col = None
+            for col in ['Dx', 'diagnosis', 'label']:
+                if col in merged_df.columns:
+                    dx_col = col
+                    break
+            
+            if dx_col is None:
+                 raise ValueError(f"Colonna diagnosi non trovata. Colonne disponibili: {merged_df.columns}")
+
+            # Applica il mapping. Se un valore non è nel dizionario, potrebbe dare errore o NaN.
+            try:
+                y_true = merged_df[dx_col].map(label_mapping).astype(int)
+            except ValueError as e:
+                 print(f"Errore durante il mapping delle etichette. Valori unici trovati in {dx_col}: {merged_df[dx_col].unique()}")
+                 raise e
+            # ---------------------------------------------
+
             print("----- Valutazione Classificazione -----")
             print(f"Accuracy: {accuracy_score(y_true, y_pred):.4f}")
             print(f"F1-Score (Weighted): {f1_score(y_true, y_pred, average='weighted'):.4f}")

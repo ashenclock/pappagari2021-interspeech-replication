@@ -25,26 +25,28 @@ data:
 # ===================================================================
 
 transcription:
-  # CAMBIA QUI PER SCEGLIERE IL MOTORE: "crisperwhisper" o "nemo"
-  engine: "crisperwhisper"
+  # CAMBIA QUI: "crisperwhisper", "nemo", o "whisperx"
+  engine: "nemo"
   overwrite: false
 
-  # --- Impostazioni per CrisperWhisper (usate solo se engine: "crisperwhisper") ---
+  # --- SEZIONE CRISPERWHISPER RIVISTA E CORRETTA ---
   crisperwhisper:
-    # Modello Whisper di base usato da insanely-fast-whisper
-    whisper_model_name: "openai/whisper-large-v3"
+    # L'unico parametro che ci serve è l'ID del modello su Hugging Face
+    model_id: "nyrahealth/CrisperWhisper" 
+    batch_size: 16
+    compute_type: "float16" # o "int8"
     
-    # Modello T5 per la correzione del testo
-    correction_model_name: "nyra-health/t5-large-text-correction"
-    
-    batch_size: 8
-    compute_type: "float16" # Usa "int8" se la GPU ha poca VRAM
-
-  # --- Impostazioni per NeMo (usate solo se engine: "nemo") ---
+  # --- Impostazioni per NeMo ---
   nemo:
     model_name: "nvidia/parakeet-tdt-0.6b-v2"
-    batch_size: 16
+    batch_size: 2
 
+  # --- Impostazioni per WhisperX ---
+  whisperx:
+    model_name: "nyrahealth/faster_CrisperWhisper"
+    batch_size: 16
+    compute_type: "float16"
+    language: "en"
 # ===================================================================
 #                     CONFIGURAZIONE ESPERIMENTO
 # ===================================================================
@@ -60,25 +62,25 @@ modality: "text"          # "text" o "audio"
 # Deve corrispondere al nome della cartella creata da 'transcribe.py'.
 # Esempio per Crisper: "Crisper_whisper-large-v3"
 # Esempio per NeMo: "parakeet-tdt-0.6b-v2"
-transcription_model_for_training: "Crisper_whisper-large-v3"
+transcription_model_for_training: "parakeet-tdt-0.6b-v2"
 
 # --- Cross-Validation ---
 k_folds: 10
-output_dir: "outputs/bert_classification_crisper_large-v3" # Cartella dove salvare modelli e predizioni
+output_dir: "outputs/bert_classification_CrisperWhisper" # Cartella dove salvare modelli e predizioni
 
 # --- Parametri del Modello ---
 model:
   text:
-    name: "bert-base-uncased"
-    max_length: 512
-    dropout: 0.2
+    name: "bert-large-uncased"
+    max_length: 275
+    dropout: 0.1
 
   audio:
     name: "ecapa-tdnn"
     pretrained: "speechbrain/spkrec-ecapa-voxceleb"
     sample_rate: 16000
     trainable_encoder: true 
-    dropout: 0.2
+    dropout: 0.1
 
 # --- Parametri di Addestramento ---
 training:
@@ -86,6 +88,6 @@ training:
   batch_size: 8
   learning_rate: 2.0e-5
   weight_decay: 0.01
-  warmup_steps: 100
-  early_stopping_patience: 3
-  eval_metric: "f1" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
+  warmup_ratio: 0.1
+  early_stopping_patience: 5
+  eval_metric: "rmse" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
