@@ -230,12 +230,28 @@ class Evaluator:
             # ---------------------------------------------
 
             print("----- Valutazione Classificazione -----")
-            print(f"Accuracy: {accuracy_score(y_true, y_pred):.4f}")
-            print(f"F1-Score (Weighted): {f1_score(y_true, y_pred, average='weighted'):.4f}")
+              # --- INIZIO SNIPPET AGGIUNTO ---
+            cm = confusion_matrix(y_true, y_pred)
+            tn, fp, fn, tp = cm.ravel()
+            
+            # Calcolo di Sensibilità (Recall) e Specificità
+            sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+            specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+            
+            # --- FINE SNIPPET AGGIUNTO ---
+
             print("\nClassification Report:")
-            print(classification_report(y_true, y_pred, target_names=['CN', 'AD']))
+            class_report = classification_report(y_true, y_pred, target_names=['CN', 'AD'])
+            #voglio aggiungere al classification report la specificity e sensitivity
+
+            class_report = classification_report(y_true, y_pred, target_names=['CN', 'AD'])
+            class_report += f"\nSensitivity: {sensitivity:.4f}"
+            class_report += f"\nSpecificity: {specificity:.4f}"
+            print(class_report)
+            print(f"Accuracy: {accuracy_score(y_true, y_pred):.4f}")
+            print(f"F1-Score (Macro): {f1_score(y_true, y_pred, average='macro'):.4f}")
             print("\nConfusion Matrix:")
-            print(confusion_matrix(y_true, y_pred))
+            print(cm)
             print("------------------------------------")
         else: # regression
             y_true = merged_df['MMSE']

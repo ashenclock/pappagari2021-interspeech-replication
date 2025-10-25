@@ -94,7 +94,7 @@ training:
 
 score_generation_models:
 
-  - output_dir: "outputs/bert_classification_CrisperWhisper"
+  - output_dir: "outputs/bert_classification_large-v3"
     modality: "text"
     task: "classification"
   - output_dir: "outputs/bert_classification_parakeet-tdt-1.1b"
