@@ -1,3 +1,5 @@
+# scripts/extract_features.py
+
 import argparse
 import sys
 from pathlib import Path
@@ -9,6 +11,7 @@ from scipy.stats import skew, kurtosis
 import numpy as np
 import warnings
 from multiprocessing import Pool, cpu_count
+import multiprocessing # <-- Importante
 
 # Aggiunge la root del progetto al path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -18,24 +21,29 @@ warnings.filterwarnings("ignore")
 
 # --- Variabili globali e inizializzatori per i processi figli ---
 extractor_opensmile = None
-feature_set_global = None
+extractor_disvoice = None
 
 def initialize_worker_opensmile(feature_set):
     global extractor_opensmile
     if feature_set == 'egemaps':
-        extractor_opensmile = opensmile.Smile(
-            feature_set=opensmile.FeatureSet.eGeMAPSv02,
-            feature_level=opensmile.FeatureLevel.Functionals,
-        )
+        extractor_opensmile = opensmile.Smile(feature_set=opensmile.FeatureSet.eGeMAPSv02, feature_level=opensmile.FeatureLevel.Functionals)
     elif feature_set == 'compare':
-        extractor_opensmile = opensmile.Smile(
-            feature_set=opensmile.FeatureSet.ComParE_2016,
-            feature_level=opensmile.FeatureLevel.Functionals,
-        )
+        extractor_opensmile = opensmile.Smile(feature_set=opensmile.FeatureSet.ComParE_2016, feature_level=opensmile.FeatureLevel.Functionals)
 
 def initialize_worker_mfcc():
-    # Nessuna inizializzazione pesante richiesta per librosa
     pass
+
+def initialize_worker_disvoice():
+    """Inizializza l'estrattore Disvoice in ogni processo figlio."""
+    global extractor_disvoice
+    try:
+        from disvoice.prosody import Prosody
+        # Se Praat non è nel PATH, specifica qui il percorso
+        # Esempio: extractor_disvoice = Prosody(praat_path="/usr/bin/praat")
+        extractor_disvoice = Prosody()
+    except ImportError:
+        print("ERRORE: La libreria 'disvoice' non è installata. Esegui 'pip install disvoice' DENTRO l'ambiente disvoice_env.")
+        sys.exit(1)
 
 # --- Funzioni di elaborazione per i processi figli ---
 
@@ -52,40 +60,28 @@ def process_single_file_opensmile(audio_path):
 def process_single_file_mfcc(audio_path):
     try:
         y, sr = librosa.load(str(audio_path), sr=None)
-        
-        # 1. Calcola MFCC, Delta, e Delta-Delta
-        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-        delta_mfccs = librosa.feature.delta(mfccs)
-        delta2_mfccs = librosa.feature.delta(mfccs, order=2)
-        
-        # Concatena in un'unica matrice
-        all_features = np.concatenate((mfccs, delta_mfccs, delta2_mfccs))
-        
-        # 2. Calcola le statistiche (functionals)
-        stats = {
-            'mean': np.mean(all_features, axis=1),
-            'std': np.std(all_features, axis=1),
-            'skew': skew(all_features, axis=1),
-            'kurtosis': kurtosis(all_features, axis=1),
-            'min': np.min(all_features, axis=1),
-            'max': np.max(all_features, axis=1)
-        }
-        
-        # 3. Crea un dizionario flat per il DataFrame
-        feature_dict = {'ID': audio_path.stem}
-        feature_names = [f'mfcc_{i}' for i in range(13)] + \
-                        [f'delta_{i}' for i in range(13)] + \
-                        [f'delta2_{i}' for i in range(13)]
-        
+        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13); delta_mfccs = librosa.feature.delta(mfccs); delta2_mfccs = librosa.feature.delta(mfccs, order=2)
+        all_features = np.concatenate((mfccs, delta_mfccs, delta2_mfccs)); stats = {'mean': np.mean(all_features, axis=1), 'std': np.std(all_features, axis=1), 'skew': skew(all_features, axis=1), 'kurtosis': kurtosis(all_features, axis=1), 'min': np.min(all_features, axis=1), 'max': np.max(all_features, axis=1)}
+        feature_dict = {'ID': audio_path.stem}; feature_names = [f'mfcc_{i}' for i in range(13)] + [f'delta_{i}' for i in range(13)] + [f'delta2_{i}' for i in range(13)]
         for stat_name, stat_values in stats.items():
-            for i, value in enumerate(stat_values):
-                feature_dict[f'{feature_names[i]}_{stat_name}'] = value
-                
+            for i, value in enumerate(stat_values): feature_dict[f'{feature_names[i]}_{stat_name}'] = value
         return pd.DataFrame([feature_dict])
-
     except Exception as e:
         print(f"\nATTENZIONE: Errore Librosa su {audio_path.name}: {e}. File saltato.", file=sys.stderr)
         return None
+
+def process_single_file_disvoice(audio_path):
+    global extractor_disvoice
+    try:
+        features_dict = extractor_disvoice.extract_features_file(str(audio_path), static=True)
+        feature_df = pd.DataFrame([features_dict])
+        feature_df['ID'] = audio_path.stem
+        return feature_df
+    except Exception as e:
+        if "Sound is too short" in str(e): print(f"\nINFO: File {audio_path.name} troppo corto. Saltato.", file=sys.stderr)
+        else: print(f"\nATTENZIONE: Errore Disvoice su {audio_path.name}: {e}. File saltato.", file=sys.stderr)
+        return None
+
 
 def extract_and_save(audio_root, output_path, config):
     if output_path.exists() and not config.feature_extraction.overwrite:
@@ -105,6 +101,10 @@ def extract_and_save(audio_root, output_path, config):
         initializer = initialize_worker_mfcc
         initargs = ()
         process_func = process_single_file_mfcc
+    elif feature_set == 'disvoice_prosody':
+        initializer = initialize_worker_disvoice
+        initargs = ()
+        process_func = process_single_file_disvoice
     else:
         raise ValueError(f"Feature set '{feature_set}' non supportato.")
 
@@ -115,12 +115,10 @@ def extract_and_save(audio_root, output_path, config):
                 results.append(result)
 
     if not results:
-        print("Nessuna feature estratta.")
-        return
+        print("Nessuna feature estratta."); return
 
     full_df = pd.concat(results, ignore_index=True)
     
-    # Pulizia e riordino colonne
     if feature_set in ['egemaps', 'compare']:
         cols_to_drop = ['file', 'start', 'end']
         full_df = full_df.drop(columns=[c for c in cols_to_drop if c in full_df.columns])
@@ -133,6 +131,9 @@ def extract_and_save(audio_root, output_path, config):
     print(f"Feature salvate in: {output_path}")
 
 def main():
+    # Per massima stabilità, è sempre una buona idea usare 'spawn'
+    multiprocessing.set_start_method('spawn', force=True)
+    
     parser = argparse.ArgumentParser(description="Estrae feature acustiche manuali in parallelo.")
     parser.add_argument("--config", type=str, default="config.yaml", help="Path al file di configurazione.")
     args = parser.parse_args()
@@ -149,6 +150,7 @@ def main():
     test_out = features_root / f"test_{config.feature_extraction.feature_set}.csv"
     extract_and_save(config.data.test_audio_root, test_out, config)
     print(f"\nEstrazione completata usando {cpu_count()} processi.")
+
 
 if __name__ == "__main__":
     main()

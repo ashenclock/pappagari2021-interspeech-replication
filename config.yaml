@@ -51,13 +51,13 @@ transcription:
     
 # --- Configurazione Feature Manuali --
 feature_extraction:
-  # Opzioni: "egemaps", "compare", "mfcc_stats"
-  feature_set: "mfcc_stats" 
+  # Opzioni: "egemaps", "compare", "mfcc_stats", "disvoice_prosody"
+  feature_set: "disvoice_prosody" 
   overwrite: false
 # --- Configurazione Modelli Tabulari (per feature manuali) ---
 tabular_model:
   # Opzioni: "svm", "xgboost", "lr" (Logistic Regression)
-  name: "xgboost"
+  name: "lr"
   
   # Griglie per GridSearchCV
   grids:
@@ -92,7 +92,7 @@ transcription_model_for_training: "parakeet-tdt-1.1b"
 
 # --- Cross-Validation ---
 k_folds: 10
-output_dir: "outputs/xgboost_classification_mfcc_stats" # Cartella dove salvare modelli e predizioni
+output_dir: "outputs/lr_classification_disvoice_prosody" # Cartella dove salvare modelli e predizioni
 
 # --- Parametri del Modello ---
 model:

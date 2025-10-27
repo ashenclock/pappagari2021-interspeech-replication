@@ -10,7 +10,7 @@ from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, f1_score, root_mean_squared_error
-
+from sklearn.impute import SimpleImputer
 from src.data import get_data_splits
 
 class TabularTrainer:
@@ -39,8 +39,9 @@ class TabularTrainer:
             raise ValueError(f"Modello tabulare '{model_name}' non supportato.")
         
         return Pipeline([
-            ('scaler', StandardScaler()),
-            ('clf', clf)
+            ('imputer', SimpleImputer(strategy='mean')), # Riempie i NaN con la media della colonna
+            ('scaler', StandardScaler()),                 # Scala le feature (ora senza NaN)
+            ('clf', clf)                                  # Addestra il classificatore
         ])
 
     def train(self):
