@@ -178,88 +178,112 @@ class Predictor:
         results_df[['ID', 'prediction']].to_csv(output_file, index=False)
         print(f"\nPredizioni salvate in {output_file}")
         
+
 class Evaluator:
     def __init__(self, config):
         self.config = config
-        self.predictions_path = Path(config.output_dir) / "predictions.csv"
+        self.output_dir = Path(config.output_dir)
+        self.predictions_path = self.output_dir / "predictions.csv"
         if config.task == 'classification':
             self.labels_path = Path(config.data.test_task1_labels)
         else:
             self.labels_path = Path(config.data.test_task2_labels)
-    
+
     def evaluate(self):
         if not self.predictions_path.exists():
             raise FileNotFoundError(f"File di predizioni non trovato: {self.predictions_path}")
-        
+
         preds_df = pd.read_csv(self.predictions_path)
         labels_df = pd.read_csv(self.labels_path)
-        
-        # Assicuriamoci che la colonna ID si chiami allo stesso modo per il merge
-        # A volte i CSV hanno nomi leggermente diversi (es. 'id', 'ID', 'adressfname')
-        if 'ID' not in labels_df.columns:
-             # Cerca una colonna che potrebbe essere l'ID
-             possible_id_cols = [col for col in labels_df.columns if 'id' in col.lower() or 'name' in col.lower()]
-             if possible_id_cols:
-                 labels_df = labels_df.rename(columns={possible_id_cols[0]: 'ID'})
-             else:
-                 raise ValueError("Non riesco a trovare la colonna ID nel file delle etichette.")
 
+        id_col_labels = next((c for c in labels_df.columns if 'id' in c.lower() or 'name' in c.lower()), 'ID')
+        labels_df = labels_df.rename(columns={id_col_labels: 'ID'})
         merged_df = pd.merge(preds_df, labels_df, on="ID")
-        
+
+        if merged_df.empty:
+            print("ERRORE: Nessun ID in comune tra predizioni ed etichette.")
+            return
+
         y_pred = merged_df['prediction']
+        report_lines = []
+
+        # --- INTESTAZIONE DEL REPORT ---
+        report_lines.append(f"--- Report di Valutazione per l'Esperimento: {self.output_dir.name} ---")
+        report_lines.append("=" * 70)
+        report_lines.append(f"Task: {self.config.task}")
         
+        # --- LOGICA CORRETTA PER IDENTIFICARE IL TIPO DI MODELLO ---
+        if hasattr(self.config, 'tabular_model'): # Esperimento con feature manuali/embedding
+            report_lines.append(f"Modalità: Tabulare")
+            report_lines.append(f"  - Modello Classificatore: {self.config.tabular_model.name}")
+            
+            # Controlla se è basato su embedding o feature manuali
+            if hasattr(self.config, 'embedding_extraction') and self.config.embedding_extraction.name == self.config.feature_extraction.feature_set:
+                report_lines.append(f"  - Feature: Embeddings da '{self.config.embedding_extraction.model_type}'")
+            else:
+                 report_lines.append(f"  - Feature: Set '{self.config.feature_extraction.feature_set}'")
+
+        elif hasattr(self.config, 'modality'): # Esperimento Deep Learning (run.py)
+            report_lines.append(f"Modalità: Deep Learning ({self.config.modality})")
+            if self.config.modality == 'text':
+                report_lines.append(f"  - Modello Testo: {self.config.model.text.name}")
+                report_lines.append(f"  - Trascrizioni da ASR: {self.config.transcription_model_for_training}")
+            elif self.config.modality == 'audio':
+                 report_lines.append(f"  - Modello Audio: {self.config.model.audio.name}")
+                 report_lines.append(f"  - Pretrained: {self.config.model.audio.pretrained}")
+        
+        report_lines.append("\n" + ("-" * 30))
+
+        # Il resto della logica di valutazione rimane invariato
         if self.config.task == 'classification':
-            # --- FIX CRUCIALE: MAPPING DELLE ETICHETTE ---
-            # Convertiamo le stringhe 'Control'/'ProbableAD' in 0/1
-            # Adatta questo dizionario se le tue etichette sono diverse (es. 'CN'/'AD')
             label_mapping = {'Control': 0, 'ProbableAD': 1, 'CN': 0, 'AD': 1}
-            
-            # Usa la colonna corretta per la diagnosi. Potrebbe chiamarsi 'Dx', 'diagnosis', ecc.
-            # Cerchiamo di essere flessibili.
-            dx_col = None
-            for col in ['Dx', 'diagnosis', 'label']:
-                if col in merged_df.columns:
-                    dx_col = col
-                    break
-            
+            dx_col = next((c for c in ['Dx', 'diagnosis', 'label'] if c in merged_df.columns), None)
             if dx_col is None:
-                 raise ValueError(f"Colonna diagnosi non trovata. Colonne disponibili: {merged_df.columns}")
-
-            # Applica il mapping. Se un valore non è nel dizionario, potrebbe dare errore o NaN.
-            try:
-                y_true = merged_df[dx_col].map(label_mapping).astype(int)
-            except ValueError as e:
-                 print(f"Errore durante il mapping delle etichette. Valori unici trovati in {dx_col}: {merged_df[dx_col].unique()}")
-                 raise e
-            # ---------------------------------------------
-
-            print("----- Valutazione Classificazione -----")
-              # --- INIZIO SNIPPET AGGIUNTO ---
+                raise ValueError(f"Colonna diagnosi non trovata. Colonne disponibili: {merged_df.columns}")
+            
+            y_true = merged_df[dx_col].map(label_mapping)
+            
+            # Calcolo metriche
+            accuracy = accuracy_score(y_true, y_pred)
+            f1_w = f1_score(y_true, y_pred, average='weighted')
+            f1_macro = f1_score(y_true, y_pred, average='macro')
             cm = confusion_matrix(y_true, y_pred)
-            tn, fp, fn, tp = cm.ravel()
             
-            # Calcolo di Sensibilità (Recall) e Specificità
-            sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
-            specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
-            
-            # --- FINE SNIPPET AGGIUNTO ---
+            sensitivity, specificity = 0, 0
+            if len(cm.ravel()) == 4:
+                tn, fp, fn, tp = cm.ravel()
+                sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+                specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
 
-            print("\nClassification Report:")
-            class_report = classification_report(y_true, y_pred, target_names=['CN', 'AD'])
-            #voglio aggiungere al classification report la specificity e sensitivity
+            report_lines.append("\n--- Metriche Principali ---")
+            report_lines.append(f"Accuracy           : {accuracy:.4f}")
+            report_lines.append(f"F1-Score (Weighted): {f1_w:.4f}")
+            report_lines.append(f"F1-Score (Macro)   : {f1_macro:.4f}")
+            report_lines.append(f"Sensitivity (Recall): {sensitivity:.4f}")
+            report_lines.append(f"Specificity        : {specificity:.4f}")
 
-            class_report = classification_report(y_true, y_pred, target_names=['CN', 'AD'])
-            class_report += f"\nSensitivity: {sensitivity:.4f}"
-            class_report += f"\nSpecificity: {specificity:.4f}"
-            print(class_report)
-            print(f"Accuracy: {accuracy_score(y_true, y_pred):.4f}")
-            print(f"F1-Score (Macro): {f1_score(y_true, y_pred, average='macro'):.4f}")
-            print("\nConfusion Matrix:")
-            print(cm)
-            print("------------------------------------")
-        else: # regression
+            report_lines.append("\n--- Classification Report Dettagliato ---")
+            report_lines.append(classification_report(y_true, y_pred, target_names=['CN', 'AD']))
+
+            report_lines.append("\n--- Confusion Matrix ---")
+            report_lines.append(str(cm))
+
+        else: # Regression
             y_true = merged_df['MMSE']
-            print("----- Valutazione Regressione -----")
             rmse = root_mean_squared_error(y_true, y_pred)
-            print(f"RMSE: {rmse:.4f}")
-            print("------------------------------------")
+            report_lines.append("\n--- Metriche Principali (Regressione) ---")
+            report_lines.append(f"RMSE: {rmse:.4f}")
+
+        report_lines.append("\n" + "="*70)
+        
+        full_report_string = "\n".join(report_lines)
+        print("\n" + full_report_string)
+        
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
+        report_filepath = reports_dir / f"{self.output_dir.name}_report.txt"
+        
+        with open(report_filepath, "w", encoding="utf-8") as f:
+            f.write(full_report_string)
+            
+        print(f"\nReport dettagliato salvato in: {report_filepath}")
