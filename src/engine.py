@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.metrics import accuracy_score, f1_score, root_mean_squared_error, classification_report, confusion_matrix
-
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from src.models import build_model
 from src.utils import clear_memory
 
@@ -62,6 +62,8 @@ def evaluate_epoch(model, loader, loss_fn, device, task, metric_name):
             metric = accuracy_score(all_labels, all_preds)
         elif metric_name == 'f1':
             metric = f1_score(all_labels, all_preds, average='weighted')
+        elif metric_name == 'loss':
+            return avg_loss, avg_loss
         else:
             raise ValueError(f"Metrica '{metric_name}' non supportata per la classificazione.")
     else: # regression
@@ -88,8 +90,10 @@ class Trainer:
             optimizer = torch.optim.Adam(model.parameters(), lr=self.config.training.learning_rate, weight_decay=self.config.training.weight_decay)
         
         num_training_steps = len(self.train_loader) * self.config.training.epochs
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=int(num_training_steps * self.config.training.warmup_ratio), num_training_steps=num_training_steps)
-        
+        if self.config.modality == 'text':
+            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=int(num_training_steps * self.config.training.warmup_ratio), num_training_steps=num_training_steps)
+        else: # audio
+            scheduler = CosineAnnealingLR(optimizer, T_max=num_training_steps)
         loss_fn = nn.CrossEntropyLoss() if self.config.task == 'classification' else nn.MSELoss()
 
         best_metric = -np.inf if self.config.training.eval_metric in ['accuracy', 'f1'] else np.inf

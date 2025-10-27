@@ -16,6 +16,7 @@ data:
   test_transcripts_root: "transcripts_test"
   test_task1_labels: "Adresso21/label_test_task1.csv"
   test_task2_labels: "Adresso21/label_test_task2.csv"
+  features_root: "extracted_features"
 
 # ===================================================================
 #                   CONFIGURAZIONE TRASCRIZIONE (ASR)
@@ -26,7 +27,7 @@ data:
 
 transcription:
   # CAMBIA QUI: "crisperwhisper", "nemo", o "whisperx"
-  engine: "nemo"
+  engine: "canary"
   overwrite: false
 
   # --- SEZIONE CRISPERWHISPER RIVISTA E CORRETTA ---
@@ -47,6 +48,31 @@ transcription:
     batch_size: 16
     compute_type: "float16"
     language: "en"
+    
+# --- Configurazione Feature Manuali --
+feature_extraction:
+  # Opzioni: "egemaps", "compare", "mfcc_stats"
+  feature_set: "mfcc_stats" 
+  overwrite: false
+# --- Configurazione Modelli Tabulari (per feature manuali) ---
+tabular_model:
+  # Opzioni: "svm", "xgboost", "lr" (Logistic Regression)
+  name: "xgboost"
+  
+  # Griglie per GridSearchCV
+  grids:
+    svm:
+      C: [0.1, 1, 10, 100]
+      gamma: ["scale", "auto", 0.1, 0.01]
+      kernel: ["rbf", "linear"]
+    xgboost:
+      n_estimators: [100, 200, 300]
+      max_depth: [3, 5, 7]
+      learning_rate: [0.01, 0.1, 0.2]
+    lr:
+      C: [0.01, 0.1, 1, 10]
+      penalty: ["l1", "l2"]
+      solver: ["liblinear"] # necessario per l1
 # ===================================================================
 #                     CONFIGURAZIONE ESPERIMENTO
 # ===================================================================
@@ -56,7 +82,7 @@ transcription:
 
 # --- Task e Modello ---
 task: "classification"    # "classification" o "regression"
-modality: "text"          # "text" o "audio"
+modality: "audio"          # "text" o "audio"
 
 # Modello di trascrizione da usare per l'addestramento del modello testuale.
 # Deve corrispondere al nome della cartella creata da 'transcribe.py'.
@@ -66,7 +92,7 @@ transcription_model_for_training: "parakeet-tdt-1.1b"
 
 # --- Cross-Validation ---
 k_folds: 10
-output_dir: "outputs/bert_classification_parakeet-tdt-1.1b" # Cartella dove salvare modelli e predizioni
+output_dir: "outputs/xgboost_classification_mfcc_stats" # Cartella dove salvare modelli e predizioni
 
 # --- Parametri del Modello ---
 model:
@@ -86,11 +112,11 @@ model:
 training:
   epochs: 15
   batch_size: 8
-  learning_rate: 2.0e-5
+  learning_rate: 1.0e-3
   weight_decay: 0.01
   warmup_ratio: 0.1
   early_stopping_patience: 5
-  eval_metric: "accuracy" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
+  eval_metric: "loss" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
 
 score_generation_models:
 

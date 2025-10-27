@@ -50,7 +50,10 @@ class EcapaTdnnClassifier(nn.Module):
         
         self.classifier_head = nn.Sequential(
             nn.Dropout(config.model.audio.dropout),
-            nn.Linear(num_features, num_classes)
+            nn.Linear(num_features, num_features // 2),
+            nn.ReLU(),
+            nn.Dropout(config.model.audio.dropout),
+            nn.Linear(num_features // 2, num_classes)
         )
 
     def forward(self, batch):

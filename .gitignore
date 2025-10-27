@@ -14,3 +14,9 @@ all_files.txt
 best_fused_submission.csv
 fused_submission.csv
 reports
+extracted_features
+pretrained_models
+output.log
+*.ipynb
+.ipynb_checkpoints/
+**/.pynb_checkpoints/

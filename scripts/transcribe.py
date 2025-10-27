@@ -108,7 +108,6 @@ def get_nemo_transcriber(config):
             out_path.write_text(final_text.strip() if final_text else "", encoding='utf-8')
     return transcribe_files
 
-
 def get_whisperx_transcriber(config):
     # ... (codice identico a prima, nessuna modifica)
     try:
