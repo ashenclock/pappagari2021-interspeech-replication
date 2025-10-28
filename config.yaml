@@ -49,15 +49,28 @@ transcription:
     compute_type: "float16"
     language: "en"
     
-# --- Configurazione Feature Manuali --
+## --- Configurazione Feature Manuali --
 feature_extraction:
-  # Opzioni: "egemaps", "compare", "mfcc_stats", "disvoice_prosody"
-  feature_set: "disvoice_prosody" 
+  # Opzioni: "egemaps", "compare", "mfcc_stats", "disvoice_prosody", "whisper_large_v3"
+  feature_set: "whisper_large_v3" # <-- IMPOSTA QUESTO PER ESTRARRE GLI EMBEDDING
   overwrite: false
+
+# --- NUOVA SEZIONE: Configurazione Estrazione Embedding ---
+embedding_extraction:
+  # Questo 'name' deve corrispondere a quello che metti in 'feature_set'
+  name: "whisper_large_v3"
+  
+  # Puoi cambiarlo con "nyrahealth/CrisperWhisper" o altri modelli compatibili
+  model_id: "openai/whisper-large-v3"
+  
+  # Il pooling "mean" è la scelta standard e più robusta
+  pooling_strategy: "mean"
+  #Numero di campioni per batch durante l'estrazione degli embedding
+  batch_size: 16
 # --- Configurazione Modelli Tabulari (per feature manuali) ---
 tabular_model:
   # Opzioni: "svm", "xgboost", "lr" (Logistic Regression)
-  name: "lr"
+  name: "xgboost"
   
   # Griglie per GridSearchCV
   grids:
@@ -92,7 +105,7 @@ transcription_model_for_training: "parakeet-tdt-1.1b"
 
 # --- Cross-Validation ---
 k_folds: 10
-output_dir: "outputs/lr_classification_disvoice_prosody" # Cartella dove salvare modelli e predizioni
+output_dir: "outputs/xgboost_classification_whisper" # Cartella dove salvare modelli e predizioni
 
 # --- Parametri del Modello ---
 model:
@@ -111,18 +124,16 @@ model:
 # --- Parametri di Addestramento ---
 training:
   epochs: 15
-  batch_size: 8
+  batch_size: 16
   learning_rate: 1.0e-3
   weight_decay: 0.01
   warmup_ratio: 0.1
   early_stopping_patience: 5
-  eval_metric: "loss" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
+  eval_metric: "f1" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
 
 score_generation_models:
 
   - output_dir: "outputs/bert_classification_large-v3"
-    modality: "text"
-    task: "classification"
+  - output_dir: "outputs/ecapa-tdnn_classification_large-v3"
+  - output_dir: "outputs/xgboost_classification_whisper"
   - output_dir: "outputs/bert_classification_parakeet-tdt-1.1b"
-    modality: "text"
-    task: "classification"

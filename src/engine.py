@@ -219,7 +219,7 @@ class Evaluator:
             
             # Controlla se è basato su embedding o feature manuali
             if hasattr(self.config, 'embedding_extraction') and self.config.embedding_extraction.name == self.config.feature_extraction.feature_set:
-                report_lines.append(f"  - Feature: Embeddings da '{self.config.embedding_extraction.model_type}'")
+                 report_lines.append(f"  - Feature: Embeddings da '{self.config.embedding_extraction.model_id}'")
             else:
                  report_lines.append(f"  - Feature: Set '{self.config.feature_extraction.feature_set}'")
 

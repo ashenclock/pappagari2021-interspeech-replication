@@ -158,15 +158,28 @@ class TabularPredictor:
         if not fold_scores:
             raise ValueError("Nessun modello trovato per la predizione.")
             
-        # Ensemble averaging
         avg_scores = np.mean(fold_scores, axis=0)
         
-        results_df = pd.DataFrame({
+        # DataFrame per la fusione (richiede solo ID e score)
+        results_df_for_fusion = pd.DataFrame({
             'ID': ids_test,
             'score': avg_scores,
-            'prediction': (avg_scores >= 0.5).astype(int)
         })
         
-        out_file = self.output_dir / "predictions.csv"
-        results_df.to_csv(out_file, index=False)
-        print(f"Predizioni salvate in {out_file}")
+        # DataFrame completo per la submission diretta (con la colonna 'prediction')
+        results_df_for_submission = results_df_for_fusion.copy()
+        results_df_for_submission['prediction'] = (results_df_for_submission['score'] >= 0.5).astype(int)
+
+        # ========================== ECCO LA CORREZIONE ==========================
+        # Salviamo DUE file:
+        # 1. 'test_predictions.csv' per la fusione (ha solo ID e score)
+        # 2. 'predictions.csv' per la valutazione diretta (ha ID e prediction)
+        
+        fusion_file = self.output_dir / "test_predictions.csv"
+        results_df_for_fusion.to_csv(fusion_file, index=False)
+        print(f"Predizioni per la fusione salvate in: {fusion_file}")
+
+        submission_file = self.output_dir / "predictions.csv"
+        results_df_for_submission.to_csv(submission_file, index=False)
+        print(f"Predizioni per la submission salvate in: {submission_file}")
+        # ======================================================================
