@@ -120,6 +120,7 @@ class Trainer:
                 print("-> Early stopping attivato.")
                 break
         print(f"--- Fine Training Fold {self.fold} ---")
+        
 
 class Predictor:
     def __init__(self, config, test_loader):

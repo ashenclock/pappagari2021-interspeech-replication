@@ -20,3 +20,4 @@ output.log
 *.ipynb
 .ipynb_checkpoints/
 **/.pynb_checkpoints/
+tree.txt
