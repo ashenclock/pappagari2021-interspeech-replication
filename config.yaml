@@ -1,78 +1,66 @@
 # ===================================================================
-#                    CONFIGURAZIONE PRINCIPALE
+#                    MAIN CONFIGURATION
 # ===================================================================
 
-# --- Impostazioni Generali ---
 seed: 42
-device: "cuda"  # "cuda" o "cpu"
+device: "cuda"
 
-# --- Percorsi dei Dati ---
+# --- Data Paths ---
 data:
-  audio_root: "Adresso21/ADReSSo21-diagnosis-train/ADReSSo21/diagnosis/train/audio"
-  transcripts_root: "transcripts"
-  train_labels: "Adresso21/ADReSSo21-diagnosis-train/ADReSSo21/diagnosis/train/adresso-train-mmse-scores.csv"
-  
-  test_audio_root: "Adresso21/ADReSSo21-diagnosis-test/ADReSSo21/diagnosis/test-dist/audio"
-  test_transcripts_root: "transcripts_test"
-  test_task1_labels: "Adresso21/label_test_task1.csv"
-  test_task2_labels: "Adresso21/label_test_task2.csv"
-  features_root: "extracted_features"
+  audio_root: "datasets/sicily_final/audio"
+  train_labels: "datasets/sicily_final/splits/train_dev.csv"
+  transcripts_root: "datasets/sicily_final/transcripts"
+  features_root: "datasets/sicily_final/features"
+  test_audio_root: "datasets/sicily_final/audio"
+  test_transcripts_root: "datasets/sicily_final/transcripts"
+  test_task1_labels: "datasets/sicily_final/splits/test.csv"
+  test_task2_labels: "datasets/sicily_final/splits/test.csv"
 
 # ===================================================================
-#                   CONFIGURAZIONE TRASCRIZIONE (ASR)
-# ===================================================================
-# Modifica 'engine' per scegliere quale motore ASR usare.
-# Lo script leggerà solo la sezione di configurazione corrispondente.
+#                   ASR TRANSCRIPTION
 # ===================================================================
 
 transcription:
-  # CAMBIA QUI: "crisperwhisper", "nemo", o "whisperx"
-  engine: "canary"
+  engine: "whisperx"  # "crisperwhisper", "nemo", or "whisperx"
   overwrite: false
 
-  # --- SEZIONE CRISPERWHISPER RIVISTA E CORRETTA ---
   crisperwhisper:
-    # L'unico parametro che ci serve è l'ID del modello su Hugging Face
-    model_id: "nyrahealth/CrisperWhisper" 
-    batch_size: 16
-    compute_type: "float16" # o "int8"
-    
-  # --- Impostazioni per NeMo ---
-  nemo:
-    model_name: "nvidia/parakeet-tdt-1.1b"
-    batch_size: 2
-
-  # --- Impostazioni per WhisperX ---
-  whisperx:
-    model_name: "nyrahealth/faster_ecapatdnn"
+    model_id: "nyrahealth/CrisperWhisper"
     batch_size: 16
     compute_type: "float16"
-    language: "en"
-    
-## --- Configurazione Feature Manuali --
+    language: "it"
+
+  nemo:
+    model_name: "nvidia/parakeet-tdt-0.6b-v3"
+    batch_size: 2
+
+  whisperx:
+    model_name: "nyrahealth/faster_CrisperWhisper"
+    batch_size: 16
+    compute_type: "float16"
+    language: "it"
+
+# ===================================================================
+#                   FEATURE EXTRACTION
+# ===================================================================
+
 feature_extraction:
-  # Opzioni: "egemaps", "compare", "mfcc_stats", "disvoice_prosody", "whisper_large_v3"
-  feature_set: "whisper_large_v3" # <-- IMPOSTA QUESTO PER ESTRARRE GLI EMBEDDING
+  # Options: "egemaps", "compare", "mfcc_stats", "disvoice_prosody", "whisper_large_v3"
+  feature_set: "whisper_large_v3"
   overwrite: false
 
-# --- NUOVA SEZIONE: Configurazione Estrazione Embedding ---
 embedding_extraction:
-  # Questo 'name' deve corrispondere a quello che metti in 'feature_set'
   name: "whisper_large_v3"
-  
-  # Puoi cambiarlo con "nyrahealth/CrisperWhisper" o altri modelli compatibili
   model_id: "openai/whisper-large-v3"
-  
-  # Il pooling "mean" è la scelta standard e più robusta
   pooling_strategy: "mean"
-  #Numero di campioni per batch durante l'estrazione degli embedding
   batch_size: 16
-# --- Configurazione Modelli Tabulari (per feature manuali) ---
+
+# ===================================================================
+#                   TABULAR MODELS (SVM, XGBoost, LR)
+# ===================================================================
+
 tabular_model:
-  # Opzioni: "svm", "xgboost", "lr" (Logistic Regression)
-  name: "xgboost"
-  
-  # Griglie per GridSearchCV
+  name: "xgboost"  # "svm", "xgboost", or "lr"
   grids:
     svm:
       C: [0.1, 1, 10, 100]
@@ -85,51 +73,45 @@ tabular_model:
     lr:
       C: [0.01, 0.1, 1, 10]
       penalty: ["l1", "l2"]
-      solver: ["liblinear"] # necessario per l1
+      solver: ["liblinear"]
+
 # ===================================================================
-#                     CONFIGURAZIONE ESPERIMENTO
-# ===================================================================
-# Questa sezione controlla le operazioni di training, predizione e valutazione
-# lanciate con 'python scripts/run.py'.
+#                   EXPERIMENT SETTINGS
 # ===================================================================
 
-# --- Task e Modello ---
-task: "classification"    # "classification" o "regression"
-modality: "audio"          # "text" o "audio"
+task: "classification"  # "classification" or "regression"
+modality: "text"        # "text" or "audio"
 
-# Modello di trascrizione da usare per l'addestramento del modello testuale.
-# Deve corrispondere al nome della cartella creata da 'transcribe.py'.
-# Esempio per Crisper: "Crisper_whisper-large-v3"
-# Esempio per NeMo: "parakeet-tdt-0.6b-v2"
-transcription_model_for_training: "parakeet-tdt-1.1b"
+transcription_model_for_training: "parakeet-tdt-0.6b-v3"
 
-# --- Cross-Validation ---
 k_folds: 10
-output_dir: "outputs/bert_classification_CrisperWhisper" # Cartella dove salvare modelli e predizioni
+output_dir: "outputs/experiment_name"
 
-# --- Parametri del Modello ---
 model:
+  output_dim: 1
   text:
-    name: "bert-large-uncased"
-    max_length: 275
-    dropout: 0.1
-
+    name: "Musixmatch/umberto-commoncrawl-cased-v1"
+    max_length: 256
+    dropout: 0.2
   audio:
     name: "ecapa-tdnn"
     pretrained: "speechbrain/spkrec-ecapa-voxceleb"
     sample_rate: 16000
-    trainable_encoder: true 
+    trainable_encoder: true
     dropout: 0.1
 
-# --- Parametri di Addestramento ---
 training:
-  epochs: 15
-  batch_size: 16
-  learning_rate: 1.0e-3
+  epochs: 20
+  batch_size: 8
+  learning_rate: 2.0e-5
   weight_decay: 0.01
   warmup_ratio: 0.1
   early_stopping_patience: 5
-  eval_metric: "f1" # Per classificazione: "accuracy" o "f1". Per regressione: "rmse".
+  eval_metric: "f1"  # "accuracy", "f1" for classification; "rmse" for regression
+
+# ===================================================================
+#                   MODEL FUSION (optional)
+# ===================================================================
 
 score_generation_models:
   - output_dir: "outputs/bert_classification_large-v3"

@@ -1,23 +1,38 @@
+# Environment
 .env
-outputs
-Adresso21
-transcripts
-transcripts_test
-scripts/__pycache__
-src/__pycache__
-usage.txt
-predictions_task1.csv
-predictions_task2.csv
-outputs_audio
-pappagari21_interspeech.pdf
-all_files.txt
-best_fused_submission.csv
-fused_submission.csv
-reports
-extracted_features
-pretrained_models
-output.log
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Jupyter
 *.ipynb
 .ipynb_checkpoints/
-**/.pynb_checkpoints/
-tree.txt
+
+# Data & models (too large for git)
+datasets/
+Adresso21/
+transcripts/
+transcripts_test/
+extracted_features/
+pretrained_models/
+outputs/
+
+# Reports & plots (generated)
+reports/
+plots/
+
+# Artifacts
+*.csv
+!config.yaml
+*.log
+*.pdf
+*.txt
+!requirements*.txt
+!README.md

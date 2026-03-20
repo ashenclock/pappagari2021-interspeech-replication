@@ -1,0 +1,24 @@
+# Core dependencies for training (BERT text + ECAPA-TDNN audio)
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+torch==2.2.0
+torchaudio==2.2.0
+transformers==4.40.1
+speechbrain==0.5.16
+scikit-learn==1.4.2
+xgboost
+pandas==2.2.2
+numpy<2.0
+pyyaml==6.0.1
+tqdm==4.66.4
+scipy==1.13.0
+joblib
+
+# Feature extraction (optional, needed for extract_features.py)
+opensmile==2.6.0
+librosa==0.10.1
+
+# ASR backends (install only the one you need)
+# WhisperX:  pip install git+https://github.com/m-bain/whisperx.git faster-whisper
+# NeMo:      pip install nemo_toolkit[asr]==1.23.0
+# CrisperWhisper: pip install git+https://github.com/nyrahealth/transformers.git@crisper_whisper
